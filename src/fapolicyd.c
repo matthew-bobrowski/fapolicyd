@@ -1,7 +1,7 @@
 /*
  * fapolicyd.c - Main file for the program
  * Copyright (c) 2016,2018 Red Hat Inc., Durham, North Carolina.
- * All Rights Reserved. 
+ * All Rights Reserved.
  *
  * This software may be freely redistributed and/or modified under the
  * terms of the GNU General Public License as published by the Free
@@ -15,11 +15,12 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; see the file COPYING. If not, write to the
- * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor 
+ * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor
  * Boston, MA 02110-1335, USA.
  *
  * Authors:
  *   Steve Grubb <sgrubb@redhat.com>
+ *   Radovan Sroka <rsroka@redhat.com>
  */
 
 #include "config.h"
@@ -31,7 +32,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <fcntl.h>
-#include <sys/resource.h> 
+#include <sys/resource.h>
 #include <stdio.h>
 #include <ctype.h>
 #include <grp.h>
@@ -40,6 +41,8 @@
 #include <linux/unistd.h>  /* syscall numbers */
 #include <sys/stat.h>	/* umask */
 #include <seccomp.h>
+#include <stdatomic.h>
+
 #include "notify.h"
 #include "policy.h"
 #include "event.h"
@@ -54,10 +57,10 @@
 int debug = 0, permissive = 0;
 
 // Signal handler notifications
-volatile int stop = 0;
+volatile atomic_bool stop = 0;
 
 // Local variables
-static const char *pidfile = "/var/run/fapolicyd.pid";
+static const char *pidfile = "/run/fapolicyd.pid";
 #define REPORT "/var/log/fapolicyd-access.log"
 static struct daemon_conf config;
 
@@ -100,7 +103,7 @@ static void term_handler(int sig)
 	stop = 1 + sig; // Just so its used...
 }
 
-// This is a workaround for https://bugzilla.redhat.com/show_bug.cgi?id=643031 
+// This is a workaround for https://bugzilla.redhat.com/show_bug.cgi?id=643031
 #define UNUSED(x) (void)(x)
 extern int rpmsqEnable (int signum, void *handler);
 int rpmsqEnable (int signum, void *handler)
@@ -253,9 +256,9 @@ int main(int argc, char *argv[])
 			if (isdigit(*argv[i])) {
 				errno = 0;
 				struct passwd *pw;
-				
+
 				config.uid = strtoul(argv[i], NULL, 10);
-				
+
 				if (errno) {
 					msg(LOG_ERR,
 						"Error converting user value");
@@ -323,13 +326,13 @@ int main(int argc, char *argv[])
 	sigaction(SIGINT, &sa, NULL);
 
 	// Bump up resources
-        limit.rlim_cur = RLIM_INFINITY;
-        limit.rlim_max = RLIM_INFINITY;
-        setrlimit(RLIMIT_FSIZE, &limit);
-        setrlimit(RLIMIT_NOFILE, &limit);
+	limit.rlim_cur = RLIM_INFINITY;
+	limit.rlim_max = RLIM_INFINITY;
+	setrlimit(RLIMIT_FSIZE, &limit);
+	setrlimit(RLIMIT_NOFILE, &limit);
 
 	// Set strict umask
-	(void) umask( 0237 );
+	(void) umask( 0117 );
 
 	// get more time slices because everything is waiting on us
 	rc = nice(-config.nice_val);
@@ -354,6 +357,8 @@ int main(int argc, char *argv[])
 
 	// If we are not going to be root, then setup necessary capabilities
 	if (config.uid != 0) {
+		if (preconstruct_fifo(&config))
+			exit(1);
 		capng_clear(CAPNG_SELECT_BOTH);
 		capng_updatev(CAPNG_ADD, CAPNG_EFFECTIVE|CAPNG_PERMITTED,
 			CAP_DAC_OVERRIDE, CAP_SYS_ADMIN, CAP_SYS_PTRACE,
@@ -385,6 +390,10 @@ int main(int argc, char *argv[])
 	msg(LOG_DEBUG, "Starting to listen for events");
 	while (!stop) {
 		rc = poll(pfd, 1, -1);
+
+#ifdef DEBUG
+		msg(LOG_DEBUG, "Main poll interrupted");
+#endif
 		if (rc < 0) {
 			if (errno == EINTR)
 				continue;
@@ -395,14 +404,16 @@ int main(int argc, char *argv[])
 			}
 		} else if (rc > 0) {
 			if (pfd[0].revents & POLLIN) {
+				lock_update_thread();
 				handle_events();
+				unlock_update_thread();
 			}
 
 			// This will always need to be here as long as we
 			// link against librpm. Turns out that librpm masks
 			// signals to prevent corrupted databases during an
 			// update. Since we only do read access, we can turn
-			// them back on. 
+			// them back on.
 			sigaction(SIGTERM, &sa, NULL);
 			sigaction(SIGINT, &sa, NULL);
 		}
@@ -435,4 +446,3 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
-

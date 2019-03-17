@@ -1,7 +1,7 @@
 /*
  * process.c - functions to access attributes of processes
  * Copyright (c) 2016 Red Hat Inc., Durham, North Carolina.
- * All Rights Reserved. 
+ * All Rights Reserved.
  *
  * This software may be freely redistributed and/or modified under the
  * terms of the GNU General Public License as published by the Free
@@ -15,7 +15,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; see the file COPYING. If not, write to the
- * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor 
+ * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor
  * Boston, MA 02110-1335, USA.
  *
  * Authors:
@@ -180,7 +180,6 @@ char *get_type_from_pid(pid_t pid, size_t blen, char *buf)
 
 	return NULL;
 }
-
 uid_t get_program_auid_from_pid(pid_t pid)
 {
 	char path[PATH_MAX+1];
@@ -195,6 +194,7 @@ uid_t get_program_auid_from_pid(pid_t pid)
 		rc = read(fd, path, PATH_MAX);
 		close(fd);
 		if (rc > 0) {
+			path[rc] = 0;  // manually terminate, read doesn't
 			errno = 0;
 			auid = strtol(path, NULL, 10);
 			if (errno == 0)
@@ -218,6 +218,7 @@ int get_program_sessionid_from_pid(pid_t pid)
 		rc = read(fd, path, PATH_MAX);
 		close(fd);
 		if (rc > 0) {
+			path[rc] = 0;  // manually terminate, read doesn't
 			errno = 0;
 			ses = strtol(path, NULL, 10);
 			if (errno == 0)
@@ -247,4 +248,3 @@ uid_t get_program_uid_from_pid(pid_t pid)
 	}
 	return uid;
 }
-

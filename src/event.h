@@ -15,11 +15,12 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; see the file COPYING. If not, write to the
- * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor 
+ * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor
  * Boston, MA 02110-1335, USA.
  *
  * Authors:
  *   Steve Grubb <sgrubb@redhat.com>
+ *   Radovan Sroka <rsroka@redhat.com>
  */
 
 #ifndef EVENT_HEADER
@@ -41,6 +42,7 @@ typedef struct ev {
 } event_t;
 
 int init_event_system(struct daemon_conf *config);
+int flush_cache(struct daemon_conf *config);
 void destroy_event_system(void);
 int new_event(const struct fanotify_event_metadata *m, event_t *e);
 subject_attr_t *get_subj_attr(event_t *e, subject_type_t t);

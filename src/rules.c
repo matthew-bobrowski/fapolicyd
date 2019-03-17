@@ -1,7 +1,7 @@
 /*
 * rules.c - Minimal linked list set of rules
 * Copyright (c) 2016,2018 Red Hat Inc., Durham, North Carolina.
-* All Rights Reserved. 
+* All Rights Reserved.
 *
 * This software may be freely redistributed and/or modified under the
 * terms of the GNU General Public License as published by the Free
@@ -15,7 +15,7 @@
 *
 * You should have received a copy of the GNU General Public License
 * along with this program; see the file COPYING. If not, write to the
- * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor 
+ * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor
  * Boston, MA 02110-1335, USA.
 *
 * Authors:
@@ -64,7 +64,7 @@ void rules_first(llist *l)
 void rules_last(llist *l)
 {
         register lnode* window;
-	
+
 	if (l->head == NULL)
 		return;
 
@@ -336,7 +336,7 @@ static int nv_split(char *buf, lnode *n, int lineno)
 		msg(LOG_ERR, "Object is missing in line %d", lineno);
 		return 6;
 	}
-	return 0;	
+	return 0;
 }
 
 // Returns 0 if success and 1 on rule failure.
@@ -449,6 +449,67 @@ static int subj_dir_test(subject_attr_t *s, subject_attr_t *subj)
 	return 1;
 }
 
+/*
+ * Notes about elf program startup
+ * ===============================
+ * The run time linker will do the folowing:
+ * 1) kernel loads executable
+ * 2) kernel attaches ld-2.2x.so to executable memory and turns over execution
+ * 3) rtl loads LD_AUDIT libs
+ * 4) rtl loads LD_PRELOAD libs
+ * 5) rtl next loads /etc/ld.so.preload libs
+ *
+ * Then for each dependency:
+ * Call into LD_AUDIT la_objsearch() to modify path/name and try
+ * 1) RPATH in object
+ * 2) RPATH in executable
+ * 3) LD_LIBRARY_PATH: for each path, iterate permutations of
+ *    tls, x86_64, haswell, & plain path
+ * 4) RUNPATH in object
+ * 5) Try the name as found in the object
+ * 6) Consult /etc/ld.so.cache
+ * 7) Try default path (can't find where string table is)
+ *
+ * LD_AUDIT modules can add arbitrary early file system actions because
+ * the may also call open. They can also trigger loading another copy of
+ * libc.so.6.
+ *
+ * Patterns
+ * ========
+ * Normal:
+ *    exe=/usr/bin/bash file=/usr/bin/ls
+ *    exe=/usr/bin/bash file=/usr/lib64/ld-2.27.so
+ *    exe=/usr/bin/ls file=/etc/ld.so.cache
+ *    exe=/usr/bin/ls file=/usr/lib64/libselinux.so.1
+ *
+ * runtime linker started:
+ *    exe=/usr/bin/bash file=/usr/lib64/ld-2.27.so
+ *    exe=/usr/bin/bash file=/usr/bin/ls
+ *    exe=/usr/lib64/ld-2.27.so file=/etc/ld.so.cache
+ *    exe=/usr/lib64/ld-2.27.so file=/usr/lib64/libselinux.so.1
+ *
+ * LD_PRELOAD=libaudit no LD_LIBRARY_PATH:
+ *    exe=/usr/bin/bash file=/usr/bin/ls
+ *    exe=/usr/bin/bash file=/usr/lib64/ld-2.27.so
+ *    exe=/usr/bin/ls file=/usr/lib64/libaudit.so.1.0.0
+ *    exe=/usr/bin/ls file=/etc/ld.so.cache
+ *    exe=/usr/bin/ls file=/usr/lib64/libselinux.so.1
+ *
+ * LD_PRELOAD=libaudit with LD_LIBRARY_PATH:
+ *    exe=/usr/bin/bash file=/usr/bin/ls
+ *    exe=/usr/bin/bash file=/usr/lib64/ld-2.28.so
+ *    exe=/usr/bin/ls file=/usr/lib64/libaudit.so.1.0.0
+ *    exe=/usr/bin/ls file=/usr/lib64/libselinux.so.1
+ *
+ * /etc/ld.so.preload:
+ *    exe=/usr/bin/bash file=/usr/bin/ls
+ *    exe=/usr/bin/bash file=/usr/lib64/ld-2.27.so
+ *    exe=/usr/bin/ls file=/etc/ld.so.preload
+ *    exe=/usr/bin/ls file=/usr/lib64/libaudit.so.1.0.0
+ *
+ *    This means only first two can be counted on. Looking for ld.so.cache
+ *    is no good because its almost the last option.
+ */
 
 //#define NEW_WAY 1
 
@@ -524,7 +585,7 @@ msg(LOG_DEBUG, "path2: %s", pinfo->path2);
 				   || (pinfo->elf_info & HAS_RPATH))
 					// ld.so normally checks cache first
 					pinfo->state = STATE_NORMAL;
-				else 
+				else
 					// but preload does the preload
 					pinfo->state = STATE_LD_PRELOAD;
 			} else
@@ -714,4 +775,3 @@ void rules_clear(llist *l)
 	l->cur = NULL;
 	l->cnt = 0;
 }
-

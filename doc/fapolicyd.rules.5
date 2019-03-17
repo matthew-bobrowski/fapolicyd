@@ -5,7 +5,7 @@ fapolicyd.rules \- fapolicyd rules to determine access rights
 \fBfapolicyd.rules\fP is a file that contains the rules that \fBfapolicyd\fP uses to make decisions about access rights. The rules follow a simple format of:
 
 .nf
-.B access decision subject object
+.B access subject object
 .fi
 
 They are evaluated from top to bottom with the first rule to match being used
@@ -62,7 +62,7 @@ The \fIexecdirs\fP option will match against the following list of directories:
 The \fIexecdirs\fP option will match against the same list as \fIexecdirs\fP but also includes /etc/.
 .TP 12
 .B untrusted
-The \fIuntrusted\fP option will look up the current executable's full path in the rpm database to see if the execuatble is known to the system. The rule will trigger if the file in question is not packaged.
+The \fIuntrusted\fP option will look up the current executable's full path in the rpm database to see if the executable is known to the system. The rule will trigger if the file in question is not packaged.
 .RE
 .TP
 .B exe_type
@@ -75,10 +75,30 @@ This option takes the mime type of a file as an argument. If you wish to check t
 .TP
 .B exe_device
 This option will match against the device that the executable resides on. To use it, start with /dev/ and add the target device name.
+
+.TP
+.B pattern
+There are various ways that an attacker may try to execute code that may reveal itself in the pattern of file accesses made during program startup. This rule can take one of several options depending on which access patterns is wished to be blocked. Fapolicyd is able to detect these different access patterns and provide the access decision as soon as it identifies the pattern. The pattern type can be any of:
+
+.RS
+.TP 12
+.B normal
+This matches against any ELF program that is dynamically linked.
+.TP
+.B ld_preload
+This matches against access patterns that indicate that LD_PRELOAD is being used in starting up the application.
+.TP
+.B bad_interpreter
+This matches against access patterns that indicate that the defaul ELF interpreter is not being used.
+.TP
+.B ld_so
+This matches against access patterns that indicate that the program is being started directly by the runtime linker.
+.RE
+
 .RE
 
 .SS Object
-The object is the file that the subject is interacting with. The fields in the rule that describe the obbject are written in a name=value format. There can be one or more object fields. Each field is and'ed with others to decide if a rule triggers. The name can be any of the following:
+The object is the file that the subject is interacting with. The fields in the rule that describe the object are written in a name=value format. There can be one or more object fields. Each field is and'ed with others to decide if a rule triggers. The name can be any of the following:
 
 .RS
 .TP 12
@@ -107,6 +127,7 @@ The following rules show how rules may look.
 .nf
 .B deny_audit exe=/usr/bin/wget dir=/tmp
 .B allow exe=/usr/bin/python3.4 dir=execdirs ftype=text/x-python
+.B deny_audit pattern ld_preload all
 .B deny all all
 .fi
 

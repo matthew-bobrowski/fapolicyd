@@ -1,7 +1,7 @@
 /*
  * event.c - Functions to access event attributes
  * Copyright (c) 2016,2018 Red Hat Inc., Durham, North Carolina.
- * All Rights Reserved. 
+ * All Rights Reserved.
  *
  * This software may be freely redistributed and/or modified under the
  * terms of the GNU General Public License as published by the Free
@@ -15,11 +15,12 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; see the file COPYING. If not, write to the
- * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor 
+ * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor
  * Boston, MA 02110-1335, USA.
  *
  * Authors:
  *   Steve Grubb <sgrubb@redhat.com>
+ *   Radovan Sroka <rsroka@redhat.com>
  */
 
 #include "config.h"
@@ -49,6 +50,21 @@ int init_event_system(struct daemon_conf *config)
 				(void (*)(void *))object_clear, "Object");
 	if (!obj_cache)
 		return 1;
+
+	return 0;
+}
+
+int flush_cache(struct daemon_conf *config)
+{
+	msg(LOG_DEBUG, "Flushing caches");
+	destroy_lru(obj_cache);
+
+	obj_cache = init_lru(config->obj_cache_size,
+				(void (*)(void *))object_clear, "Object");
+	if (!obj_cache)
+		return 1;
+
+	msg(LOG_DEBUG, "Flushed");
 
 	return 0;
 }
@@ -119,7 +135,7 @@ int new_event(const struct fanotify_event_metadata *m, event_t *e)
 	if (finfo == NULL)
 		return 1;
 
-	// Just using inodes don't give a good key. It needs 
+	// Just using inodes don't give a good key. It needs
 	// conditioning to use more slots in the cache.
 	unsigned long magic = finfo->inode + finfo->time.tv_nsec + finfo->size;
 	key = compute_object_key(obj_cache, magic);
@@ -273,7 +289,7 @@ object_attr_t *get_obj_attr(event_t *e, object_type_t t)
 			if (on)
 				obj.o = strdup(on->o);
 			else {
-				ptr = get_file_from_fd(e->fd, e->pid, 
+				ptr = get_file_from_fd(e->fd, e->pid,
 							sizeof(buf), buf);
 				if (ptr)
 					obj.o = strdup(buf);
@@ -286,7 +302,7 @@ object_attr_t *get_obj_attr(event_t *e, object_type_t t)
 					sizeof(buf), buf);
 			if (ptr)
 				obj.o = strdup(buf);
-			else 
+			else
 				obj.o = strdup("?");
 			break;
 		case FTYPE:
@@ -412,4 +428,3 @@ void run_usage_report(struct daemon_conf *config, FILE *f)
 	print_queue_stats(f, subj_cache);
 	fprintf(f, "\n");
 }
-

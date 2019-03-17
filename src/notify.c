@@ -1,7 +1,7 @@
 /*
  * notify.c - functions handle recieving and enqueuing events
  * Copyright (c) 2016-18 Red Hat Inc., Durham, North Carolina.
- * All Rights Reserved. 
+ * All Rights Reserved.
  *
  * This software may be freely redistributed and/or modified under the
  * terms of the GNU General Public License as published by the Free
@@ -15,11 +15,12 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; see the file COPYING. If not, write to the
- * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor 
+ * Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor
  * Boston, MA 02110-1335, USA.
  *
  * Authors:
  *   Steve Grubb <sgrubb@redhat.com>
+ *   Radovan Sroka <rsroka@redhat.com>
  */
 
 #include "config.h" /* Needed to get O_LARGEFILE definition */
@@ -32,7 +33,7 @@
 #include <pthread.h>
 #include <signal.h>
 #include <sys/syscall.h>
-#include <sys/utsname.h>
+#include <stdatomic.h>
 #include "file.h"
 #include "policy.h"
 #include "event.h"
@@ -47,7 +48,7 @@
 #define FANOTIFY_BUFFER_SIZE 8192
 
 // External variables
-extern volatile int stop;
+extern volatile atomic_int stop;
 
 // Local variables
 static pid_t our_pid;
@@ -57,7 +58,7 @@ static pthread_t deadmans_switch_thread;
 static pthread_mutexattr_t decision_lock_attr;
 static pthread_mutex_t decision_lock;
 static pthread_cond_t do_decision;
-static volatile int events_ready;
+static volatile atomic_bool events_ready;
 static volatile pid_t decision_tid;
 static volatile int alive = 1;
 static int fd;
@@ -129,7 +130,7 @@ int init_fanotify(struct daemon_conf *conf)
 retry_mark:
 		if (fanotify_mark(fd, FAN_MARK_ADD | FAN_MARK_MOUNT,
 				mask, -1, path) == -1) {
-			/* 
+			/*
 			 * The FAN_OPEN_EXEC_PERM mask is not supported by
 			 * all kernel releases prior to 5.0. Retry setting
 			 * up the mark using only the legacy FAN_OPEN_PERM
@@ -365,4 +366,3 @@ void handle_events(void)
 		metadata = FAN_EVENT_NEXT(metadata, len);
 	}
 }
-
