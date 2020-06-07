@@ -1,5 +1,26 @@
-EXTRA_DIST = fapolicyd.rules  fapolicyd.mounts fapolicyd.service fapolicyd.conf fapolicyd-tmpfiles.conf
+EXTRA_DIST = \
+	fapolicyd.rules.known-libs \
+	fapolicyd.rules.restrictive \
+	fapolicyd.service \
+	fapolicyd.conf \
+	fapolicyd.trust \
+	fapolicyd-tmpfiles.conf \
+	fapolicyd-magic
+
 fapolicyddir = $(sysconfdir)/fapolicyd
-dist_fapolicyd_DATA = fapolicyd.rules fapolicyd.mounts fapolicyd.conf
+
+dist_fapolicyd_DATA = \
+	fapolicyd.conf \
+	fapolicyd.trust
+
 systemdservicedir = $(systemdsystemunitdir)
 dist_systemdservice_DATA = fapolicyd.service
+
+
+
+MAGIC = fapolicyd-magic.mgc fapolicyd.rules.*
+pkgdata_DATA = ${MAGIC}
+CLEANFILES = ${MAGIC}
+
+${MAGIC}: $(EXTRA_DIST)
+	file -C -m ${top_srcdir}/init/fapolicyd-magic

@@ -1,4 +1,76 @@
+1.0.1
+- If trust db is empty when fapolicyd-cli dumps it, say its empty
+- Make fapolicyd-cli buffer bigger for rule listing
+- Fix ignored db errors from check_trust_database
+- Adjust ELF x-object detection
+- Do device mime-type detection in-house instead of libmagic
+
+1.0
+- Add file size, IMA, and sha256 based integrity checking
+- Add ability to send decision results to syslog
+- Add ability to define the format of the syslog event
+- Add support for sets in rules
+- Add support for dumping the trustdb by fapolicyd-cli
+- Print a warning if rpm backend doesn't have a sha256 hash
+- In rpm backend, add back javascript from /usr/share
+
+0.9.4
+- Fix pattern detection in light of EXEC_PERM events
+- Conserve memory by dropping unneeded lists after startup
+- Do full reset of subject credentials when execve finishes 
+- Drop files in /usr/share, /usr/src, and /usr/include to reduce memory use
+- Add error checking of the trust database
+- Fixed threading issue during rpm update
+- Add option to delete the trust database to cli, --delete-db
+- Add option to cli to add/delete/update the file trust database
+
+0.9.3
+- In fapolicyd-cli, add a --list option to list rules
+- Change lmdb to use writable mmap for startup performance improvment
+- Change the database to support duplicate keys
+- Provide a magic override file and use it during file inspection
+- Update rules to match new magic overrides
+- Add --ftype command to fapolicyd-cli
+- Add database statistics to usage report
+
+0.9.2
+- Split codebase into daemon, library and cli
+- Add Admin defined trust database
+- Make use of librpm optional
+- Updated the man pages
+- Setting boost, queue, user, and group on the command line are deprecated
+
+0.9.1
+- Make watched filesystems configurable
+- Improve ELF file classification
+- Expose file type in debug output
+- Update rules for ansible and dracut
+- Skip config files in database check
+- Expand definition of doc files
+- Create new rule format exposing Subj and Obj trust
+- Redesign the rules for trust based rules
+
+0.9
+- Convert hashes to lowercase like sha256sum outputs
+- Use FAN_OPEN_EXEC_PERM for subject cache management
+- Add static pattern detection
+- Performance improvements
+- Switch from static mounts to hotplug configuration of mount points
+- Dont collect documentation in trust database
+- When path is longer than lmdb can store, use a sha512 hash (Attila Lakatos)
+- Cache subject trustworthiness information after lookup (Radovan Sroka)
+
+0.8.10
+- Fix segfault for rules whose subject is number oriented
+- When database problem is found on startup, rebuild database
+- Don't flush empty caches on database rebuild
+- Revise default settings for better performance
+
 0.8.9
+- Systemd usage updates
+- File permission adjustments based on selinux policy review
+- Fix unterminated reads of auid & sessionid values
+- Deprecate ld_preload pattern until new method exists
 
 0.8.8
 - Add FAN_OPEN_EXEC_PERM Support (Matthew Bobrowski)

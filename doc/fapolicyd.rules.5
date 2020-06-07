@@ -1,23 +1,28 @@
-.TH FAPOLICYD.RULES: "7" "May 2016" "Red Hat" "System Administration Utilities"
+.TH FAPOLICYD.RULES: "5" "May 2020" "Red Hat" "System Administration Utilities"
 .SH NAME
 fapolicyd.rules \- fapolicyd rules to determine access rights
 .SH DESCRIPTION
 \fBfapolicyd.rules\fP is a file that contains the rules that \fBfapolicyd\fP uses to make decisions about access rights. The rules follow a simple format of:
 
 .nf
-.B access subject object
+.B decision perm subject : object
 .fi
 
 They are evaluated from top to bottom with the first rule to match being used
-for the access control decision.
+for the access control decision. The colon is mandatory to separate subject and object since they share keywords.
 
-.SS Access
+.SS Decision
 The decision is either
-.IR allow ", " deny ", " allow_audit ", or " deny_audit ".
-If the rule triggers, this is the access decision that fapolicyd will tell the kernel. If the decision is one of the audit variety, then the decision will trigger a FANOTIFY audit event with all relevant information.
+.IR allow ", " deny ", " allow_audit ", " deny_audit ", " allow_syslog ", "deny_syslog ", " allow_log ", or " deny_log ".
+If the rule triggers, this is the access decision that fapolicyd will tell the kernel. If the decision is one of the audit variety, then the decision will trigger a FANOTIFY audit event with all relevant information. If the decision is one of the syslog variety, then the decision will trigger writing an event into syslog. If the decision is of one the log variety, then it will create an audit event and a syslog event. Regardless of the notification, any rule with a deny in the keyword will deny access and any with an allow in the keyword will allow access.
+
+.SS Perm
+Perm describes what kind permission is being asked for. The permission is either
+.IR open ", " execute ", or " any ".
+If none are given, then open is assumed.
 
 .SS Subject
-The subject is the process that is performing actions on system resources. The fields in the rule that describe the subject are written in a name=value format.i There can be one or more subject fields. Each field is and'ed with others to decide if a rule triggers. The name can be any of the following:
+The subject is the process that is performing actions on system resources. The fields in the rule that describe the subject are written in a name=value format. There can be one or more subject fields. Each field is and'ed with others to decide if a rule triggers. The name values can be any of the following:
 
 .RS
 .TP 12
@@ -36,14 +41,17 @@ This is the numeric session id that the audit system assigns to users when they 
 .B pid
 This is the numeric process id that a program has.
 .TP
+.B trust
+This is a boolean describing whether it is required for the subject to be in the trust database or not. A value of 1 means its required while 0 means its not.
+.TP
 .B comm
 This is the shortened command name. When an interpreter starts a program, it usually renames the program to the script rather than the interpreter.
 .TP
 .B exe
 This is the full path to the executable. Globbing is not supported. You may also use the special keyword \fBuntrusted\fP to match on the subject not being listed in the rpm database.
 .TP
-.B exe_dir
-If you wish to match a directory, then use this by giving the full path to the directory. Its recommended to end with the / to ensure it matches a directory. There are 3 keywords that \fIexe_dir\fP supports: \fBexecdirs\fP, \fBsystemdirs\fP, \fBuntrusted\fP.
+.B dir
+If you wish to match a directory, then use this by giving the full path to the directory. Its recommended to end with the / to ensure it matches a directory. There are 3 keywords that \fIdir\fP supports: \fBexecdirs\fP, \fBsystemdirs\fP, \fBuntrusted\fP.
 .RS
 .TP 12
 .B execdirs
@@ -59,21 +67,23 @@ The \fIexecdirs\fP option will match against the following list of directories:
 .RE
 .TP 12
 .B systemdirs
-The \fIexecdirs\fP option will match against the same list as \fIexecdirs\fP but also includes /etc/.
+The \fIsystemdirs\fP option will match against the same list as \fIexecdirs\fP but also includes /etc/.
 .TP 12
 .B untrusted
-The \fIuntrusted\fP option will look up the current executable's full path in the rpm database to see if the executable is known to the system. The rule will trigger if the file in question is not packaged.
+The \fIuntrusted\fP option will look up the current executable's full path in the rpm database to see if the executable is known to the system. The rule will trigger if the file in question is not in the trust database. This option is
+.B deprecated
+in favor of using obj_trust with execute permission when writing rules.
 .RE
 .TP
-.B exe_type
+.B ftype
 This option takes the mime type of a file as an argument. If you wish to check the mime type of a file while writing rules, run the following command:
 
 .nf
-.B file --mime-type /path-to-file
+.B file \-\-mime-type /path-to-file
 .fi
 
 .TP
-.B exe_device
+.B device
 This option will match against the device that the executable resides on. To use it, start with /dev/ and add the target device name.
 
 .TP
@@ -85,20 +95,17 @@ There are various ways that an attacker may try to execute code that may reveal 
 .B normal
 This matches against any ELF program that is dynamically linked.
 .TP
-.B ld_preload
-This matches against access patterns that indicate that LD_PRELOAD is being used in starting up the application.
-.TP
-.B bad_interpreter
-This matches against access patterns that indicate that the defaul ELF interpreter is not being used.
-.TP
 .B ld_so
 This matches against access patterns that indicate that the program is being started directly by the runtime linker.
+.TP
+.B static
+This matches against ELF files that are statically linked.
 .RE
 
 .RE
 
 .SS Object
-The object is the file that the subject is interacting with. The fields in the rule that describe the object are written in a name=value format. There can be one or more object fields. Each field is and'ed with others to decide if a rule triggers. The name can be any of the following:
+The object is the file that the subject is interacting with. The fields in the rule that describe the object are written in a name=value format. There can be one or more object fields. Each field is and'ed with others to decide if a rule triggers. The name values can be any of the following:
 
 .RS
 .TP 12
@@ -109,30 +116,60 @@ This matches against any subject. When used, this must be the only subject in th
 This is the full path to the file that will be accessed. Globbing is not supported. You may also use the special keyword \fBuntrusted\fP to match on the subject not being listed in the rpm database.
 .TP
 .B dir
-If you wish to match on access to any file in a directory, then use this by giving the full path to the directory. Its recommended to end with the / to ensure it matches a directory. There are 3 keywords that \fIexe_dir\fP supports: \fBexecdirs\fP, \fBsystemdirs\fP, \fBuntrusted\fP. See the \fBexe_dir\fP for an explanation of these keywords.
+If you wish to match on access to any file in a directory, then use this by giving the full path to the directory. Its recommended to end with the / to ensure it matches a directory. There are 3 keywords that \fIdir\fP supports: \fBexecdirs\fP, \fBsystemdirs\fP, \fBuntrusted\fP. See the \fBdir\fP option under Subject for an explanation of these keywords.
 .TP
 .B device
 This option will match against the device that the file being accessed resides on. To use it, start with /dev/ and add the target device name.
 .TP
 .B ftype
-This option matches against the mime type of the file being accessed. See \fBexe_type\fP for more information on determining the mime type.
+This option matches against the mime type of the file being accessed. See \fBftype\fP under Subject for more information on determining the mime type.
+.TP
+.B trust
+This is a boolean describing whether it is required for the object to be in the trust database or not. A value of 1 means its required while 0 means its not.
 .TP
 .B sha256hash
-This option matches against the sha256 hash of the file being accessed.
+This option matches against the sha256 hash of the file being accessed. The hash in the rules should be all lowercase letters and do NOT start with 0x. Lowercase is the default output of sha256sum.
 .RE
 
+.SH SETS
+Set is a named group of values of the same type. Fapolicyd internally distinguishes between INT and STRING set types. You can define your own set and use it as a value for a specific rule attribute. The definition is in key=value syntax and starts with a set name. The set name has to start with % and the rest is alphanumeric. The value is a comma separated list. The set type is inherited from the first item in the list. If that can be turned into number then whole list is expected to carry numbers. One can use these sets as a value for subject and object attributes. It is also possible to use a plain list as an attribute value without previous definition. The assigned set has to match the attribute type. It is not possible set groups for TRUST and PATTERN attributes.
+
+
+.SS SETS EXAMPLES
+.nf
+.B # definition
+.b # string set
+.B %python=/usr/bin/python2.7,/usr/bin/python3.6
+.B allow exe=%python : all trust=1
+.B #
+.B # definition
+.B # number set
+.B %uuids=0,1000
+.B allow uid=%uuids : all
+.fi
+
+.SH NOTES
+When you are writing a rule for the execute permission, remember that the file to be executed is an object. Unless you are blocking execution from a specific program, then you would normally use
+.I all
+for the subject side.
+
+If you are writing rules that use patterns, just select
+.I any
+as the permission to be clear that this applies to anything. In reality, pattern matching ignores the permission but the suggestion is for documentation purposes.
+
 .SH EXAMPLES
-The following rules show how rules may look.
+The following rules illustrate the rule syntax.
 
 .nf
-.B deny_audit exe=/usr/bin/wget dir=/tmp
-.B allow exe=/usr/bin/python3.4 dir=execdirs ftype=text/x-python
-.B deny_audit pattern ld_preload all
-.B deny all all
+.B deny_audit perm=open exe=/usr/bin/wget : dir=/tmp
+.B allow perm=open exe=/usr/bin/python3.7 : ftype=text/x-python trust=1
+.B deny_audit perm=any pattern ld_so : all
+.B deny perm=any all : all
 .fi
 
 .SH "SEE ALSO"
-.BR fapolicyd (8)
+.BR fapolicyd (8),
+.BR fapolicyd-cli (1)
 and
 .BR fapolicyd.conf (5)
 
